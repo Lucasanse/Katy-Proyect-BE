@@ -59,16 +59,6 @@ async function main() {
         }
       },
 
-      // Relación 1 a 1: Conductor
-      conductor: {
-        create: {
-          esMismoConductor: true,
-          nombreCompleto: 'Juan Pérez',
-          documento: '35123456',
-          telefono: '2234567890',
-          email: 'juan.perez@email.com'
-        }
-      },
 
       // Relación 1 a Muchos: Terceros
       terceros: {
