@@ -12,6 +12,13 @@ const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log("Iniciando la carga de datos (Seed)...");
+  await prisma.evidencia.deleteMany();
+  await prisma.tercero.deleteMany();
+  await prisma.conductor.deleteMany();
+  await prisma.titular.deleteMany();
+  await prisma.siniestro.deleteMany();
+  await prisma.productor.deleteMany();
+  await prisma.administrador.deleteMany();
 
   // 1. Crear el usuario Administrador
   // En un entorno real, usarías bcrypt para hashear 'admin123'. 
@@ -59,8 +66,7 @@ async function main() {
           nombreCompleto: 'Juan Pérez',
           documento: '35123456',
           telefono: '2234567890',
-          email: 'juan.perez@email.com',
-          licencia: 'LIC-35123456'
+          email: 'juan.perez@email.com'
         }
       },
 

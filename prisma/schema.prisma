@@ -66,7 +66,6 @@ model Conductor {
   documento          String?
   telefono           String?
   email              String?
-  licencia           String?
   vinculo            String?
 
   siniestroId        Int       @unique
