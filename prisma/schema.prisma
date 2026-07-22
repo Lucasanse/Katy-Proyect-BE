@@ -60,15 +60,14 @@ model Titular {
 }
 
 model Conductor {
-  id               Int       @id @default(autoincrement())
-  nombreCompleto   String?
-  documento        String?
-  telefono         String?
-  email            String?
-  vinculo          String?
-
-  siniestroId      Int       @unique
-  siniestro        Siniestro @relation(fields: [siniestroId], references: [id], onDelete: Cascade)
+  id             Int       @id @default(autoincrement())
+  nombreCompleto String
+  documento      String
+  telefono       String?
+  email          String?
+  vinculo        String?
+  siniestro      Siniestro @relation(fields: [siniestroId], references: [id])
+  siniestroId    Int       @unique
 }
 
 model Productor {
