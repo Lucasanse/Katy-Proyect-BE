@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ------------------------------------------------------
+// TABLA DE ADMINISTRACIÓN (Privada)
+// ------------------------------------------------------
+model Administrador {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String   // Aquí se guardará el hash (nunca la contraseña en texto)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ------------------------------------------------------
+// TABLA PRINCIPAL: SINIESTRO
+// ------------------------------------------------------
+model Siniestro {
+  id                Int       @id @default(autoincrement())
+  fechaSiniestro    String
+  horaSiniestro     String
+  huboHeridos       Boolean   @default(false)
+  lugarCalle        String
+  lugarLocalidad    String
+  lugarProvincia    String
+  latitud           Float?
+  longitud          Float?
+  detallesAccidente String    @db.Text
+  createdAt         DateTime  @default(now())
+
+  // Relaciones
+  titular           Titular?
+  conductor         Conductor?
+  productor         Productor?
+  terceros          Tercero[]
+  evidencias        Evidencia[]
+}
+
+// ------------------------------------------------------
+// TABLAS HIJAS (Relación 1 a 1 con Siniestro)
+// ------------------------------------------------------
+model Titular {
+  id          Int       @id @default(autoincrement())
+  tipoDoc     String
+  numDoc      String
+  nombre      String
+  apellido    String
+  patente     String
+  telefono    String
+  email       String
+  seguro      String
+
+  siniestroId Int       @unique
+  siniestro   Siniestro @relation(fields: [siniestroId], references: [id], onDelete: Cascade)
+}
+
+model Conductor {
+  id                 Int       @id @default(autoincrement())
+  esMismoConductor   Boolean
+  nombreCompleto     String?
+  documento          String?
+  telefono           String?
+  email              String?
+  licencia           String?
+  vinculo            String?
+
+  siniestroId        Int       @unique
+  siniestro          Siniestro @relation(fields: [siniestroId], references: [id], onDelete: Cascade)
+}
+
+model Productor {
+  id          Int       @id @default(autoincrement())
+  esProductor Boolean   @default(false)
+  nombre      String?
+  matricula   String?
+  telefono    String?
+  email       String?
+
+  siniestroId Int       @unique
+  siniestro   Siniestro @relation(fields: [siniestroId], references: [id], onDelete: Cascade)
+}
+
+// ------------------------------------------------------
+// TABLAS MÚLTIPLES (Relación 1 a Muchos con Siniestro)
+// ------------------------------------------------------
+model Tercero {
+  id          Int       @id @default(autoincrement())
+  dni         String?
+  nombre      String?
+  apellido    String?
+  patente     String?
+  aseguradora String?
+
+  siniestroId Int
+  siniestro   Siniestro @relation(fields: [siniestroId], references: [id], onDelete: Cascade)
+}
+
+model Evidencia {
+  id            Int       @id @default(autoincrement())
+  tipoDocumento String    // Ej: "foto_patente", "dni_frente", "daños_detalle"
+  urlArchivo    String    // La URL entregada por Cloudinary
+
+  siniestroId   Int
+  siniestro     Siniestro @relation(fields: [siniestroId], references: [id], onDelete: Cascade)
+}

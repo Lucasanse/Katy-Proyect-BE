@@ -1,0 +1,33 @@
+{
+  "name": "katy-proyect-be",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lucasanse/Katy-Proyect-BE.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Lucasanse/Katy-Proyect-BE/issues"
+  },
+  "homepage": "https://github.com/Lucasanse/Katy-Proyect-BE#readme",
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.9.0",
+    "@prisma/client": "^7.9.0",
+    "express": "^5.2.1",
+    "pg": "^8.22.0"
+  },
+  "devDependencies": {
+    "prisma": "^7.9.0"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  }
+}
