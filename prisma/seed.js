@@ -2,6 +2,7 @@ require('dotenv').config();
 const { PrismaClient } = require('@prisma/client');
 const { Pool } = require('pg');
 const { PrismaPg } = require('@prisma/adapter-pg');
+const bcrypt = require('bcryptjs');
 
 // Crear la conexión utilizando la URL de tu .env
 const connectionString = process.env.DATABASE_URL;
@@ -24,15 +25,16 @@ async function main() {
   await prisma.administrador.deleteMany();
 
   // 1. Crear el usuario Administrador
+  const passwordHash = await bcrypt.hash('admin123', 10);
   const admin = await prisma.administrador.upsert({
     where: { email: 'admin@tuseguro.com' },
     update: {},
     create: {
       email: 'admin@tuseguro.com',
-      password: 'hash_falso_de_admin123', 
+      password: passwordHash,
     },
   });
-  console.log("Administrador creado:", admin.email);
+  console.log("Administrador creado:", admin.email, "(password: admin123)");
 
   // 2. Siniestro A: El titular era quien manejaba (No enviamos el objeto conductor)
   const siniestroTitular = await prisma.siniestro.create({
@@ -76,11 +78,13 @@ async function main() {
         create: [
           {
             tipoDocumento: 'foto_patente',
-            urlArchivo: 'https://res.cloudinary.com/demo/image/upload/v1/patente_juan.jpg'
+            urlArchivo: 'https://res.cloudinary.com/demo/image/upload/v1/patente_juan.jpg',
+            publicId: 'siniestros/demo/patente_juan'
           },
           {
             tipoDocumento: 'daños_detalle',
-            urlArchivo: 'https://res.cloudinary.com/demo/image/upload/v1/choque_trasero.jpg'
+            urlArchivo: 'https://res.cloudinary.com/demo/image/upload/v1/choque_trasero.jpg',
+            publicId: 'siniestros/demo/choque_trasero'
           }
         ]
       }

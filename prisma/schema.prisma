@@ -18,20 +18,31 @@ model Administrador {
 }
 
 // ------------------------------------------------------
+// ESTADOS POSIBLES DE UN SINIESTRO
+// ------------------------------------------------------
+enum EstadoSiniestro {
+  pendiente
+  en_revision
+  cerrado
+}
+
+// ------------------------------------------------------
 // TABLA PRINCIPAL: SINIESTRO
 // ------------------------------------------------------
 model Siniestro {
-  id                Int       @id @default(autoincrement())
+  id                Int             @id @default(autoincrement())
   fechaSiniestro    String
   horaSiniestro     String
-  huboHeridos       Boolean   @default(false)
+  huboHeridos       Boolean         @default(false)
   lugarCalle        String
   lugarLocalidad    String
   lugarProvincia    String
   latitud           Float?
   longitud          Float?
-  detallesAccidente String    @db.Text
-  createdAt         DateTime  @default(now())
+  detallesAccidente String          @db.Text
+  estado            EstadoSiniestro @default(pendiente)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 
   // Relaciones
   titular           Titular?
@@ -66,7 +77,7 @@ model Conductor {
   telefono       String?
   email          String?
   vinculo        String?
-  siniestro      Siniestro @relation(fields: [siniestroId], references: [id])
+  siniestro      Siniestro @relation(fields: [siniestroId], references: [id], onDelete: Cascade)
   siniestroId    Int       @unique
 }
 
@@ -101,6 +112,7 @@ model Evidencia {
   id            Int       @id @default(autoincrement())
   tipoDocumento String    // Ej: "foto_patente", "dni_frente", "daños_detalle"
   urlArchivo    String    // La URL entregada por Cloudinary
+  publicId      String    // public_id de Cloudinary, necesario para poder borrar el archivo
 
   siniestroId   Int
   siniestro     Siniestro @relation(fields: [siniestroId], references: [id], onDelete: Cascade)
