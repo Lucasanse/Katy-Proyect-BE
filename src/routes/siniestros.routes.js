@@ -4,7 +4,7 @@ const conductoresController = require('../controllers/conductores.controller');
 const tercerosController = require('../controllers/terceros.controller');
 const { requireAuth } = require('../middlewares/auth.middleware');
 const { validate } = require('../middlewares/validate.middleware');
-const { createSiniestroSchema, listSiniestrosSchema, updateEstadoSchema } = require('../validations/siniestros.validation');
+const { createSiniestroSchema, listSiniestrosSchema, updateEstadoSchema, updateSiniestroSchema } = require('../validations/siniestros.validation');
 const { addConductorSchema } = require('../validations/conductores.validation');
 const { createTerceroSchema } = require('../validations/terceros.validation');
 
@@ -20,6 +20,7 @@ router.get('/', requireAuth, validate(listSiniestrosSchema), siniestrosControlle
 router.get('/:id/terceros', requireAuth, tercerosController.listBySiniestro);
 router.get('/:id', requireAuth, siniestrosController.getById);
 router.put('/:id/estado', requireAuth, validate(updateEstadoSchema), siniestrosController.updateEstado);
+router.put('/:id', requireAuth, validate(updateSiniestroSchema), siniestrosController.update);
 router.delete('/:id', requireAuth, siniestrosController.remove);
 
 module.exports = router;

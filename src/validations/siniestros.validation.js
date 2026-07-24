@@ -1,6 +1,6 @@
 const { z } = require('zod');
 
-const ESTADOS = ['pendiente', 'en_revision', 'cerrado'];
+const ESTADOS = ['pendiente', 'en_revision', 'falta_documentacion', 'presentado_compania', 'cerrado'];
 
 const titularSchema = z.object({
   tipoDoc: z.string(),
@@ -76,6 +76,21 @@ const updateEstadoSchema = z.object({
   }),
 });
 
+const updateSiniestroSchema = z.object({
+  body: z.object({
+    fechaSiniestro: z.string().min(1).optional(),
+    horaSiniestro: z.string().min(1).optional(),
+    huboHeridos: z.boolean().optional(),
+    lugarCalle: z.string().min(1).optional(),
+    lugarLocalidad: z.string().min(1).optional(),
+    lugarProvincia: z.string().min(1).optional(),
+    latitud: z.number().nullable().optional(),
+    longitud: z.number().nullable().optional(),
+    detallesAccidente: z.string().min(1).optional(),
+    titular: titularSchema.partial().optional(),
+  }),
+});
+
 module.exports = {
   ESTADOS,
   titularSchema,
@@ -85,4 +100,5 @@ module.exports = {
   createSiniestroSchema,
   listSiniestrosSchema,
   updateEstadoSchema,
+  updateSiniestroSchema,
 };

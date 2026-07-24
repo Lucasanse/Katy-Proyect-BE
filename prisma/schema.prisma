@@ -23,6 +23,8 @@ model Administrador {
 enum EstadoSiniestro {
   pendiente
   en_revision
+  falta_documentacion
+  presentado_compania
   cerrado
 }
 

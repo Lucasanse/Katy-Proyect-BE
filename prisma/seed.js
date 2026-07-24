@@ -27,6 +27,7 @@ function addDays(baseIso, days) {
 // ------------------------------------------------------
 // 20 ASEGURADORAS DE PRUEBA (las últimas 2 quedan inactivas
 // para poder probar el borrado lógico apenas se corre el seed)
+// + "No posee aseguradora", para los casos sin cobertura
 // ------------------------------------------------------
 const NOMBRES_ASEGURADORAS = [
   'Seguros Rivadavia', 'Federación Patronal', 'Sancor Seguros', 'La Caja Seguros',
@@ -36,8 +37,10 @@ const NOMBRES_ASEGURADORAS = [
   'Testimonio Seguros', 'Continental Seguros', 'Cooperación Seguros', 'Integrity Seguros',
 ];
 
+const SIN_ASEGURADORA = 'No posee aseguradora';
+
 function buildAseguradoras() {
-  return NOMBRES_ASEGURADORAS.map((nombre, i) => ({
+  const conDatos = NOMBRES_ASEGURADORAS.map((nombre, i) => ({
     nombre,
     telefono: `0810${(300 + i).toString().padStart(3, '0')}${(1000 + i * 37).toString().padStart(4, '0')}`,
     email: `contacto@${slug(nombre)}.com.ar`,
@@ -45,6 +48,9 @@ function buildAseguradoras() {
     // Las dos últimas simulan aseguradoras dadas de baja del catálogo
     activo: i < NOMBRES_ASEGURADORAS.length - 2,
   }));
+
+  // Opción para quien no tiene cobertura: sin teléfono/email/sitio, siempre activa
+  return [...conDatos, { nombre: SIN_ASEGURADORA, telefono: null, email: null, sitioWeb: null, activo: true }];
 }
 
 // ------------------------------------------------------
@@ -82,7 +88,7 @@ const TIPOS_EVIDENCIA = [
   { tipo: 'fotos_danos', color: 'dc2626', label: 'Danos+Vehiculo' },
   { tipo: 'cedula_verde', color: '7c3aed', label: 'Cedula+Verde' },
 ];
-const ESTADOS = ['pendiente', 'en_revision', 'cerrado'];
+const ESTADOS = ['pendiente', 'en_revision', 'falta_documentacion', 'presentado_compania', 'cerrado'];
 
 const LETRAS_PATENTE = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 
@@ -108,14 +114,23 @@ function buildEvidencias(siniestroIndex) {
 }
 
 function buildSiniestros(aseguradoras) {
+  const sinAseguradora = aseguradoras.find((a) => a.nombre === SIN_ASEGURADORA);
+  // Base aproximada Mar del Plata, con una pequeña variación por siniestro
+  const BASE_LAT = -38.0055;
+  const BASE_LNG = -57.5426;
+
   return Array.from({ length: 20 }, (_, i) => {
     const nombre = NOMBRES[i];
     const apellido = APELLIDOS[i];
     const [lugarCalle, lugarLocalidad] = LOCALIDADES[i % LOCALIDADES.length];
-    const aseguradoraTitular = aseguradoras[i % aseguradoras.length];
+    // Los índices 2 y 15 quedan a propósito sin aseguradora real, para tener casos de prueba
+    const sinAseguradoraForzada = (i === 2 || i === 15) && sinAseguradora;
+    const aseguradoraTitular = sinAseguradoraForzada || aseguradoras[i % (aseguradoras.length - 1)];
     const tieneConductor = i % 2 === 0;
     const tieneProductor = i % 3 === 0;
     const cantidadTerceros = i % 3 === 1 ? 1 : i % 5 === 0 ? 2 : 0;
+    // 1 de cada 3 siniestros tiene coordenadas cargadas; el resto queda sin marcar en el mapa
+    const tieneCoordenadas = i % 3 === 0;
 
     const data = {
       fechaSiniestro: addDays('2026-05-01', i * 3),
@@ -124,6 +139,9 @@ function buildSiniestros(aseguradoras) {
       lugarCalle,
       lugarLocalidad,
       lugarProvincia: 'Buenos Aires',
+      ...(tieneCoordenadas
+        ? { latitud: BASE_LAT + i * 0.003, longitud: BASE_LNG + i * 0.004 }
+        : {}),
       detallesAccidente: DETALLES[i % DETALLES.length],
       estado: ESTADOS[i % ESTADOS.length],
 
@@ -208,21 +226,26 @@ async function main() {
   await prisma.administrador.deleteMany();
   await prisma.aseguradora.deleteMany();
 
-  // 1. Crear el usuario Administrador
-  const passwordHash = await bcrypt.hash('admin123', 10);
-  const admin = await prisma.administrador.create({
-    data: {
-      email: 'admin@tuseguro.com',
-      password: passwordHash,
-    },
+  // 1. Crear los usuarios Administrador (cualquiera de ellos ve todos los siniestros: no hay dueños por admin)
+  const [passwordHashPrincipal, passwordHashAdmin, passwordHashKaty] = await Promise.all([
+    bcrypt.hash('admin123', 10),
+    bcrypt.hash('admin', 10),
+    bcrypt.hash('admin', 10),
+  ]);
+  const admins = await prisma.administrador.createManyAndReturn({
+    data: [
+      { email: 'admin@tuseguro.com', password: passwordHashPrincipal },
+      { email: 'admin@admin.com', password: passwordHashAdmin },
+      { email: 'katy@admin.com', password: passwordHashKaty },
+    ],
   });
-  console.log('Administrador creado:', admin.email, '(password: admin123)');
+  admins.forEach((a) => console.log('Administrador creado:', a.email));
 
-  // 2. Crear 20 aseguradoras de prueba (las últimas 2 quedan inactivas)
+  // 2. Crear 21 aseguradoras de prueba ("No posee aseguradora" incluida; las últimas 2 con nombre real quedan inactivas)
   const aseguradoras = await prisma.aseguradora.createManyAndReturn({
     data: buildAseguradoras(),
   });
-  console.log(`${aseguradoras.length} aseguradoras creadas (2 inactivas de prueba)`);
+  console.log(`${aseguradoras.length} aseguradoras creadas (2 inactivas de prueba + "No posee aseguradora")`);
 
   // 3. Crear 20 siniestros de prueba con datos variados
   const siniestrosData = buildSiniestros(aseguradoras);

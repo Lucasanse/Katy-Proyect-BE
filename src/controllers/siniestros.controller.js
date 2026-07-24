@@ -36,6 +36,15 @@ async function updateEstado(req, res, next) {
   }
 }
 
+async function update(req, res, next) {
+  try {
+    const siniestro = await siniestrosService.update(Number(req.params.id), req.body);
+    res.json(siniestro);
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function remove(req, res, next) {
   try {
     await siniestrosService.remove(Number(req.params.id));
@@ -45,4 +54,4 @@ async function remove(req, res, next) {
   }
 }
 
-module.exports = { create, list, getById, updateEstado, remove };
+module.exports = { create, list, getById, updateEstado, update, remove };
