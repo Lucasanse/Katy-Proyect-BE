@@ -8,7 +8,7 @@ async function addToSiniestro(siniestroId, data) {
     throw new ApiError(404, 'Siniestro no encontrado');
   }
 
-  return prisma.tercero.create({ data: { ...data, siniestroId } });
+  return prisma.tercero.create({ data: { ...data, siniestroId }, include: { aseguradora: true } });
 }
 
 async function listBySiniestro(siniestroId) {
@@ -18,7 +18,7 @@ async function listBySiniestro(siniestroId) {
     throw new ApiError(404, 'Siniestro no encontrado');
   }
 
-  return prisma.tercero.findMany({ where: { siniestroId } });
+  return prisma.tercero.findMany({ where: { siniestroId }, include: { aseguradora: true } });
 }
 
 async function update(id, data) {
@@ -28,7 +28,7 @@ async function update(id, data) {
     throw new ApiError(404, 'Tercero no encontrado');
   }
 
-  return prisma.tercero.update({ where: { id }, data });
+  return prisma.tercero.update({ where: { id }, data, include: { aseguradora: true } });
 }
 
 async function remove(id) {

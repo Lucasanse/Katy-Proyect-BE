@@ -10,7 +10,7 @@ const titularSchema = z.object({
   patente: z.string(),
   telefono: z.string(),
   email: z.string().email(),
-  seguro: z.string(),
+  aseguradoraId: z.coerce.number().int().positive('Debe indicar la aseguradora'),
 });
 
 const conductorSchema = z.object({
@@ -34,7 +34,7 @@ const terceroSchema = z.object({
   nombre: z.string().optional(),
   apellido: z.string().optional(),
   patente: z.string().optional(),
-  aseguradora: z.string().optional(),
+  aseguradoraId: z.coerce.number().int().positive().optional(),
 });
 
 const createSiniestroSchema = z.object({

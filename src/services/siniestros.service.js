@@ -2,10 +2,10 @@ const prisma = require('../prisma/client');
 const { ApiError } = require('../middlewares/error.middleware');
 
 const FULL_INCLUDE = {
-  titular: true,
+  titular: { include: { aseguradora: true } },
   conductor: true,
   productor: true,
-  terceros: true,
+  terceros: { include: { aseguradora: true } },
   evidencias: true,
 };
 
@@ -44,7 +44,7 @@ async function list({ page, limit, estado, fechaDesde, fechaHasta }) {
       take: limit,
       orderBy: { createdAt: 'desc' },
       include: {
-        titular: true,
+        titular: { include: { aseguradora: true } },
         conductor: true,
         _count: { select: { terceros: true, evidencias: true } },
       },

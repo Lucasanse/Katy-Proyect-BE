@@ -19,6 +19,12 @@ function errorHandler(err, req, res, next) {
     return res.status(409).json({ error: 'Ya existe un registro con ese valor único', details: err.meta?.target });
   }
 
+  if (err.code === 'P2003') {
+    return res.status(400).json({
+      error: 'Operación inválida: la referencia indicada no existe, o el registro está en uso por otros datos y no se puede eliminar',
+    });
+  }
+
   if (err.name === 'MulterError') {
     return res.status(400).json({ error: err.message });
   }

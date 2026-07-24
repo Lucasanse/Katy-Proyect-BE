@@ -6,7 +6,7 @@ const createTerceroSchema = z.object({
     nombre: z.string().optional(),
     apellido: z.string().optional(),
     patente: z.string().optional(),
-    aseguradora: z.string().optional(),
+    aseguradoraId: z.coerce.number().int().positive().optional(),
   }),
 });
 
@@ -16,7 +16,7 @@ const updateTerceroSchema = z.object({
     nombre: z.string().optional(),
     apellido: z.string().optional(),
     patente: z.string().optional(),
-    aseguradora: z.string().optional(),
+    aseguradoraId: z.coerce.number().int().positive().optional(),
   }),
 });
 

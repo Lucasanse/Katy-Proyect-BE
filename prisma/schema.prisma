@@ -56,18 +56,20 @@ model Siniestro {
 // TABLAS HIJAS (Relación 1 a 1 con Siniestro)
 // ------------------------------------------------------
 model Titular {
-  id          Int       @id @default(autoincrement())
-  tipoDoc     String
-  numDoc      String
-  nombre      String
-  apellido    String
-  patente     String
-  telefono    String
-  email       String
-  seguro      String
+  id            Int         @id @default(autoincrement())
+  tipoDoc       String
+  numDoc        String
+  nombre        String
+  apellido      String
+  patente       String
+  telefono      String
+  email         String
 
-  siniestroId Int       @unique
-  siniestro   Siniestro @relation(fields: [siniestroId], references: [id], onDelete: Cascade)
+  aseguradoraId Int
+  aseguradora   Aseguradora @relation(fields: [aseguradoraId], references: [id], onDelete: Restrict)
+
+  siniestroId   Int         @unique
+  siniestro     Siniestro   @relation(fields: [siniestroId], references: [id], onDelete: Cascade)
 }
 
 model Conductor {
@@ -97,15 +99,17 @@ model Productor {
 // TABLAS MÚLTIPLES (Relación 1 a Muchos con Siniestro)
 // ------------------------------------------------------
 model Tercero {
-  id          Int       @id @default(autoincrement())
-  dni         String?
-  nombre      String?
-  apellido    String?
-  patente     String?
-  aseguradora String?
+  id            Int          @id @default(autoincrement())
+  dni           String?
+  nombre        String?
+  apellido      String?
+  patente       String?
 
-  siniestroId Int
-  siniestro   Siniestro @relation(fields: [siniestroId], references: [id], onDelete: Cascade)
+  aseguradoraId Int?
+  aseguradora   Aseguradora? @relation(fields: [aseguradoraId], references: [id], onDelete: SetNull)
+
+  siniestroId   Int
+  siniestro     Siniestro    @relation(fields: [siniestroId], references: [id], onDelete: Cascade)
 }
 
 model Evidencia {
@@ -116,4 +120,20 @@ model Evidencia {
 
   siniestroId   Int
   siniestro     Siniestro @relation(fields: [siniestroId], references: [id], onDelete: Cascade)
+}
+
+// ------------------------------------------------------
+// CATÁLOGO DE ASEGURADORAS (administrable por el panel)
+// ------------------------------------------------------
+model Aseguradora {
+  id        Int      @id @default(autoincrement())
+  nombre    String   @unique
+  telefono  String?
+  email     String?
+  sitioWeb  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  titulares Titular[]
+  terceros  Tercero[]
 }

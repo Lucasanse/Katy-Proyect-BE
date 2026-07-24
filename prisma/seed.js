@@ -4,17 +4,15 @@ const { Pool } = require('pg');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const bcrypt = require('bcryptjs');
 
-// Crear la conexión utilizando la URL de tu .env
 const connectionString = process.env.DATABASE_URL;
 const pool = new Pool({ connectionString });
 
-// Inicializar el adaptador y el cliente
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log("Iniciando la carga de datos (Seed)...");
-  
+
   // Limpieza de tablas (el orden es importante para no romper relaciones)
   await prisma.evidencia.deleteMany();
   await prisma.tercero.deleteMany();
@@ -23,21 +21,72 @@ async function main() {
   await prisma.productor.deleteMany();
   await prisma.siniestro.deleteMany();
   await prisma.administrador.deleteMany();
+  await prisma.aseguradora.deleteMany();
 
   // 1. Crear el usuario Administrador
   const passwordHash = await bcrypt.hash('admin123', 10);
-  const admin = await prisma.administrador.upsert({
-    where: { email: 'admin@tuseguro.com' },
-    update: {},
-    create: {
+  const admin = await prisma.administrador.create({
+    data: {
       email: 'admin@tuseguro.com',
       password: passwordHash,
     },
   });
   console.log("Administrador creado:", admin.email, "(password: admin123)");
 
-  // 2. Siniestro A: El titular era quien manejaba (No enviamos el objeto conductor)
-  const siniestroTitular = await prisma.siniestro.create({
+  // 2. Crear aseguradoras de ejemplo (catálogo administrable)
+  const aseguradoras = await prisma.aseguradora.createManyAndReturn({
+    data: [
+      {
+        nombre: 'Seguros Rivadavia',
+        telefono: '08101234567',
+        email: 'contacto@rivadavia.com.ar',
+        sitioWeb: 'https://www.segurosrivadavia.com',
+      },
+      {
+        nombre: 'Federación Patronal',
+        telefono: '08101234567',
+        email: 'contacto@fedpatronal.com.ar',
+        sitioWeb: 'https://www.fedpat.com.ar',
+      },
+      {
+        nombre: 'Sancor Seguros',
+        telefono: '08103337262',
+        email: 'contacto@sancorseguros.com.ar',
+        sitioWeb: 'https://www.sancorseguros.com.ar',
+      },
+      {
+        nombre: 'La Caja Seguros',
+        telefono: '08103322522',
+        email: 'contacto@lacaja.com.ar',
+        sitioWeb: 'https://www.lacaja.com.ar',
+      },
+      {
+        nombre: 'Zurich Argentina',
+        telefono: '08103099874',
+        email: 'contacto@zurich.com.ar',
+        sitioWeb: 'https://www.zurich.com.ar',
+      },
+      {
+        nombre: 'San Cristóbal Seguros',
+        telefono: '08103337262',
+        email: 'contacto@sancristobal.com.ar',
+        sitioWeb: 'https://www.sancristobal.com.ar',
+      },
+      {
+        nombre: 'Provincia Seguros',
+        telefono: '08103008888',
+        email: 'contacto@provinciaseguros.com.ar',
+        sitioWeb: 'https://www.provinciaseguros.com',
+      },
+    ],
+  });
+  console.log(`${aseguradoras.length} aseguradoras creadas`);
+
+  const rivadavia = aseguradoras.find((a) => a.nombre === 'Seguros Rivadavia');
+  const fedPatronal = aseguradoras.find((a) => a.nombre === 'Federación Patronal');
+
+  // 3. Siniestro completo: titular, conductor, productor y tercero
+  const siniestro = await prisma.siniestro.create({
     data: {
       fechaSiniestro: '2026-07-22',
       horaSiniestro: '14:30',
@@ -48,7 +97,7 @@ async function main() {
       latitud: -38.0055,
       longitud: -57.5426,
       detallesAccidente: 'Frené en el semáforo y el vehículo de atrás me impactó en el paragolpes trasero.',
-      
+
       titular: {
         create: {
           tipoDoc: 'DNI',
@@ -58,7 +107,27 @@ async function main() {
           patente: 'AB123CD',
           telefono: '2234567890',
           email: 'juan.perez@email.com',
-          seguro: 'Seguros Rivadavia'
+          aseguradoraId: rivadavia.id
+        }
+      },
+
+      conductor: {
+        create: {
+          nombreCompleto: 'Yamil García',
+          documento: '38999888',
+          telefono: '2239998880',
+          email: 'yamil@email.com',
+          vinculo: 'Amigo'
+        }
+      },
+
+      productor: {
+        create: {
+          esProductor: true,
+          nombre: 'Marcelo Sosa',
+          matricula: 'PROD-4521',
+          telefono: '2234445566',
+          email: 'marcelo.sosa@seguros.com'
         }
       },
 
@@ -69,69 +138,20 @@ async function main() {
             nombre: 'María',
             apellido: 'Gómez',
             patente: 'XYZ789',
-            aseguradora: 'Federación Patronal'
-          }
-        ]
-      },
-
-      evidencias: {
-        create: [
-          {
-            tipoDocumento: 'foto_patente',
-            urlArchivo: 'https://res.cloudinary.com/demo/image/upload/v1/patente_juan.jpg',
-            publicId: 'siniestros/demo/patente_juan'
-          },
-          {
-            tipoDocumento: 'daños_detalle',
-            urlArchivo: 'https://res.cloudinary.com/demo/image/upload/v1/choque_trasero.jpg',
-            publicId: 'siniestros/demo/choque_trasero'
+            aseguradoraId: fedPatronal.id
           }
         ]
       }
-    }
-  });
-  console.log("Siniestro 1 (Titular manejaba) creado con ID:", siniestroTitular.id);
-
-  // 3. Siniestro B: Un conductor distinto al titular estaba manejando
-  const siniestroConductorDistinto = await prisma.siniestro.create({
-    data: {
-      fechaSiniestro: '2026-07-21',
-      horaSiniestro: '09:15',
-      huboHeridos: false,
-      lugarCalle: 'Güemes y Alberti',
-      lugarLocalidad: 'Mar del Plata',
-      lugarProvincia: 'Buenos Aires',
-      latitud: -38.0155,
-      longitud: -57.5326,
-      detallesAccidente: 'Roce lateral al salir de un estacionamiento.',
-      
-      titular: {
-        create: {
-          tipoDoc: 'DNI',
-          numDoc: '40111222',
-          nombre: 'Lian',
-          apellido: 'Martínez',
-          patente: 'XYZ987',
-          telefono: '2231112220',
-          email: 'lian@email.com',
-          seguro: 'Seguros Totales'
-        }
-      },
-
-      // Aquí se crea el registro en la tabla Conductor
-      conductor: {
-        create: {
-          nombreCompleto: 'Yamil García',
-          documento: '38999888',
-          telefono: '2239998880',
-          email: 'yamil@email.com',
-          vinculo: 'Amigo'
-        }
-      }
+    },
+    include: {
+      titular: { include: { aseguradora: true } },
+      conductor: true,
+      productor: true,
+      terceros: { include: { aseguradora: true } },
     }
   });
 
-  console.log("Siniestro 2 (Conductor distinto) creado con ID:", siniestroConductorDistinto.id);
+  console.log("Siniestro creado con ID:", siniestro.id);
   console.log("¡Carga de datos finalizada!");
 }
 

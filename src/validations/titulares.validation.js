@@ -9,7 +9,7 @@ const updateTitularSchema = z.object({
     patente: z.string().optional(),
     telefono: z.string().optional(),
     email: z.string().email().optional(),
-    seguro: z.string().optional(),
+    aseguradoraId: z.coerce.number().int().positive().optional(),
   }),
 });
 
