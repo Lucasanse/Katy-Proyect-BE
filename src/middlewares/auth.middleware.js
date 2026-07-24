@@ -26,4 +26,21 @@ function requireAuth(req, res, next) {
   }
 }
 
-module.exports = { requireAuth, getTokenFromRequest };
+// Igual que requireAuth pero no rechaza la request si no hay token: permite
+// que una misma ruta pública devuelva más datos cuando quien la llama es el admin logueado.
+function optionalAuth(req, res, next) {
+  const token = getTokenFromRequest(req);
+
+  if (!token) return next();
+
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    req.admin = { id: payload.sub, email: payload.email };
+  } catch (err) {
+    // Token inválido/expirado: seguimos como anónimo en vez de cortar la request
+  }
+
+  next();
+}
+
+module.exports = { requireAuth, optionalAuth, getTokenFromRequest };

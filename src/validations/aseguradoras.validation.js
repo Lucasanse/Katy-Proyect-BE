@@ -15,6 +15,7 @@ const updateAseguradoraSchema = z.object({
     telefono: z.string().optional(),
     email: z.string().email().optional(),
     sitioWeb: z.string().optional(),
+    activo: z.boolean().optional(),
   }),
 });
 

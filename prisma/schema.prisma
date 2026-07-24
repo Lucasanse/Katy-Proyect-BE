@@ -131,6 +131,7 @@ model Aseguradora {
   telefono  String?
   email     String?
   sitioWeb  String?
+  activo    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

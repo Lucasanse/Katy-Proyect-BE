@@ -55,6 +55,8 @@ const createSiniestroSchema = z.object({
   }),
 });
 
+const SORT_FIELDS = ['createdAt', 'fechaSiniestro', 'titular'];
+
 const listSiniestrosSchema = z.object({
   query: z.object({
     page: z.coerce.number().int().min(1).optional().default(1),
@@ -62,6 +64,9 @@ const listSiniestrosSchema = z.object({
     estado: z.enum(ESTADOS).optional(),
     fechaDesde: z.string().optional(),
     fechaHasta: z.string().optional(),
+    search: z.string().optional(),
+    sortBy: z.enum(SORT_FIELDS).optional().default('createdAt'),
+    order: z.enum(['asc', 'desc']).optional().default('desc'),
   }),
 });
 

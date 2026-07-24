@@ -24,7 +24,7 @@ async function create(data) {
   });
 }
 
-async function list({ page, limit, estado, fechaDesde, fechaHasta }) {
+async function list({ page, limit, estado, fechaDesde, fechaHasta, search, sortBy, order }) {
   const where = {
     ...(estado ? { estado } : {}),
     ...(fechaDesde || fechaHasta
@@ -35,14 +35,26 @@ async function list({ page, limit, estado, fechaDesde, fechaHasta }) {
           },
         }
       : {}),
+    ...(search
+      ? {
+          titular: {
+            OR: [
+              { nombre: { contains: search, mode: 'insensitive' } },
+              { apellido: { contains: search, mode: 'insensitive' } },
+            ],
+          },
+        }
+      : {}),
   };
+
+  const orderBy = sortBy === 'titular' ? { titular: { nombre: order } } : { [sortBy]: order };
 
   const [data, total] = await Promise.all([
     prisma.siniestro.findMany({
       where,
       skip: (page - 1) * limit,
       take: limit,
-      orderBy: { createdAt: 'desc' },
+      orderBy,
       include: {
         titular: { include: { aseguradora: true } },
         conductor: true,

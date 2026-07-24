@@ -11,7 +11,9 @@ async function create(req, res, next) {
 
 async function list(req, res, next) {
   try {
-    const aseguradoras = await aseguradorasService.list();
+    // Ver inactivas es una acción de administración: solo si hay sesión de admin válida
+    const incluirInactivas = req.query.incluirInactivas === 'true' && Boolean(req.admin);
+    const aseguradoras = await aseguradorasService.list({ incluirInactivas });
     res.json(aseguradoras);
   } catch (err) {
     next(err);

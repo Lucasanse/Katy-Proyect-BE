@@ -5,8 +5,11 @@ async function create(data) {
   return prisma.aseguradora.create({ data });
 }
 
-async function list() {
-  return prisma.aseguradora.findMany({ orderBy: { nombre: 'asc' } });
+async function list({ incluirInactivas = false } = {}) {
+  return prisma.aseguradora.findMany({
+    where: incluirInactivas ? {} : { activo: true },
+    orderBy: { nombre: 'asc' },
+  });
 }
 
 async function getById(id) {
@@ -26,7 +29,9 @@ async function update(id, data) {
 
 async function remove(id) {
   await getById(id);
-  await prisma.aseguradora.delete({ where: { id } });
+  // Borrado lógico: hay siniestros históricos que referencian la aseguradora,
+  // así que en vez de eliminar el registro lo marcamos como inactivo.
+  await prisma.aseguradora.update({ where: { id }, data: { activo: false } });
 }
 
 module.exports = { create, list, getById, update, remove };
