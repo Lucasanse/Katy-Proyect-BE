@@ -11,7 +11,7 @@ async function addToSiniestro(req, res, next) {
 
 async function update(req, res, next) {
   try {
-    const conductor = await conductoresService.update(Number(req.params.id), req.body);
+    const conductor = await conductoresService.update(Number(req.params.id), req.body, req.admin);
     res.json(conductor);
   } catch (err) {
     next(err);

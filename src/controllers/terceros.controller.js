@@ -20,7 +20,7 @@ async function listBySiniestro(req, res, next) {
 
 async function update(req, res, next) {
   try {
-    const tercero = await tercerosService.update(Number(req.params.id), req.body);
+    const tercero = await tercerosService.update(Number(req.params.id), req.body, req.admin);
     res.json(tercero);
   } catch (err) {
     next(err);

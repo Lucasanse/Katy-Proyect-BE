@@ -1,5 +1,6 @@
 const prisma = require('../prisma/client');
 const { ApiError } = require('../middlewares/error.middleware');
+const { registrarAuditoria } = require('../utils/auditoria');
 
 async function addToSiniestro(siniestroId, data) {
   const siniestro = await prisma.siniestro.findUnique({ where: { id: siniestroId } });
@@ -21,12 +22,21 @@ async function listBySiniestro(siniestroId) {
   return prisma.tercero.findMany({ where: { siniestroId }, include: { aseguradora: true } });
 }
 
-async function update(id, data) {
+async function update(id, data, admin) {
   const tercero = await prisma.tercero.findUnique({ where: { id } });
 
   if (!tercero) {
     throw new ApiError(404, 'Tercero no encontrado');
   }
+
+  await registrarAuditoria({
+    siniestroId: tercero.siniestroId,
+    entidad: 'tercero',
+    entidadId: id,
+    admin,
+    anterior: tercero,
+    nuevo: data,
+  });
 
   return prisma.tercero.update({ where: { id }, data, include: { aseguradora: true } });
 }

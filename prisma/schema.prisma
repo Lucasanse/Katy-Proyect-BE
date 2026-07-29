@@ -32,26 +32,36 @@ enum EstadoSiniestro {
 // TABLA PRINCIPAL: SINIESTRO
 // ------------------------------------------------------
 model Siniestro {
-  id                Int             @id @default(autoincrement())
-  fechaSiniestro    String
-  horaSiniestro     String
-  huboHeridos       Boolean         @default(false)
-  lugarCalle        String
-  lugarLocalidad    String
-  lugarProvincia    String
-  latitud           Float?
-  longitud          Float?
-  detallesAccidente String          @db.Text
-  estado            EstadoSiniestro @default(pendiente)
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  id                     Int             @id @default(autoincrement())
+  fechaSiniestro         String
+  horaSiniestro          String
+  huboHeridos            Boolean         @default(false)
+  // Solo aplican cuando huboHeridos = true (ver validación en siniestros.validation.js)
+  intervencionPolicial   Boolean?
+  intervencionAmbulancia Boolean?
+  // Si el conductor no contaba con licencia, los adjuntos de licencia no son obligatorios
+  tieneLicencia          Boolean         @default(true)
+  lugarCalle             String
+  lugarLocalidad         String
+  lugarProvincia         String
+  latitud                Float?
+  longitud               Float?
+  detallesAccidente      String          @db.Text
+  estado                 EstadoSiniestro @default(pendiente)
+  // Se actualiza únicamente cuando cambia "estado" (a diferencia de updatedAt, que cambia con cualquier edición)
+  estadoActualizadoEn    DateTime        @default(now())
+  // Última vez que se envió el email de aviso de reclamo antiguo (ver cron de notificaciones)
+  notificadoEmailEn      DateTime?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
 
   // Relaciones
-  titular           Titular?
-  conductor         Conductor?
-  productor         Productor?
-  terceros          Tercero[]
-  evidencias        Evidencia[]
+  titular                Titular?
+  conductor              Conductor?
+  productor              Productor?
+  terceros               Tercero[]
+  evidencias             Evidencia[]
+  auditorias             RegistroAuditoria[]
 }
 
 // ------------------------------------------------------
@@ -130,7 +140,7 @@ model Evidencia {
 model Aseguradora {
   id        Int      @id @default(autoincrement())
   nombre    String   @unique
-  telefono  String?
+  cuit      String?
   email     String?
   sitioWeb  String?
   activo    Boolean  @default(true)
@@ -139,4 +149,20 @@ model Aseguradora {
 
   titulares Titular[]
   terceros  Tercero[]
+}
+
+// ------------------------------------------------------
+// AUDITORÍA DE EDICIONES DEL PANEL ADMINISTRADOR
+// ------------------------------------------------------
+model RegistroAuditoria {
+  id          Int       @id @default(autoincrement())
+  entidad     String    // "titular" | "conductor" | "tercero"
+  entidadId   Int
+  adminId     Int
+  adminEmail  String
+  cambios     Json      // { campo: { anterior, nuevo } }
+  createdAt   DateTime  @default(now())
+
+  siniestroId Int
+  siniestro   Siniestro @relation(fields: [siniestroId], references: [id], onDelete: Cascade)
 }

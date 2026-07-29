@@ -1,6 +1,7 @@
 const prisma = require('../prisma/client');
 const { ApiError } = require('../middlewares/error.middleware');
 const cloudinaryService = require('./cloudinary.service');
+const { LIMITES_POR_CATEGORIA } = require('../validations/evidencia.validation');
 
 async function upload({ siniestroId, tipoDocumento, file }) {
   if (!file) {
@@ -11,6 +12,14 @@ async function upload({ siniestroId, tipoDocumento, file }) {
 
   if (!siniestro) {
     throw new ApiError(404, 'Siniestro no encontrado');
+  }
+
+  const limite = LIMITES_POR_CATEGORIA[tipoDocumento];
+  if (limite) {
+    const cantidadActual = await prisma.evidencia.count({ where: { siniestroId, tipoDocumento } });
+    if (cantidadActual >= limite) {
+      throw new ApiError(400, `Ya se alcanzó el máximo de ${limite} archivo(s) para la categoría "${tipoDocumento}"`);
+    }
   }
 
   const result = await cloudinaryService.uploadBuffer(file.buffer, `siniestros/${siniestroId}`);

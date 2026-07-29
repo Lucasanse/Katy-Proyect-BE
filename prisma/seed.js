@@ -39,18 +39,25 @@ const NOMBRES_ASEGURADORAS = [
 
 const SIN_ASEGURADORA = 'No posee aseguradora';
 
+function cuit(i) {
+  const tipo = i % 2 === 0 ? '20' : '27';
+  const numero = (30000000 + i * 111111).toString().padStart(8, '0').slice(0, 8);
+  const verificador = i % 10;
+  return `${tipo}${numero}${verificador}`;
+}
+
 function buildAseguradoras() {
   const conDatos = NOMBRES_ASEGURADORAS.map((nombre, i) => ({
     nombre,
-    telefono: `0810${(300 + i).toString().padStart(3, '0')}${(1000 + i * 37).toString().padStart(4, '0')}`,
+    cuit: cuit(i),
     email: `contacto@${slug(nombre)}.com.ar`,
     sitioWeb: `https://www.${slug(nombre)}.com.ar`,
     // Las dos últimas simulan aseguradoras dadas de baja del catálogo
     activo: i < NOMBRES_ASEGURADORAS.length - 2,
   }));
 
-  // Opción para quien no tiene cobertura: sin teléfono/email/sitio, siempre activa
-  return [...conDatos, { nombre: SIN_ASEGURADORA, telefono: null, email: null, sitioWeb: null, activo: true }];
+  // Opción para quien no tiene cobertura: sin CUIT/email/sitio, siempre activa
+  return [...conDatos, { nombre: SIN_ASEGURADORA, cuit: null, email: null, sitioWeb: null, activo: true }];
 }
 
 // ------------------------------------------------------
@@ -86,9 +93,17 @@ const TIPOS_EVIDENCIA = [
   { tipo: 'dni_frente', color: '16a34a', label: 'DNI+Frente' },
   { tipo: 'dni_dorso', color: 'ca8a04', label: 'DNI+Dorso' },
   { tipo: 'fotos_danos', color: 'dc2626', label: 'Danos+Vehiculo' },
-  { tipo: 'cedula_verde', color: '7c3aed', label: 'Cedula+Verde' },
+  { tipo: 'cedula_frente', color: '7c3aed', label: 'Cedula+Verde' },
 ];
 const ESTADOS = ['pendiente', 'en_revision', 'falta_documentacion', 'presentado_compania', 'cerrado'];
+
+// Las 4 combinaciones posibles de intervención cuando hubo heridos, para cubrir todos los casos de prueba
+const COMBINACIONES_INTERVENCION = [
+  { intervencionPolicial: true, intervencionAmbulancia: true },
+  { intervencionPolicial: true, intervencionAmbulancia: false },
+  { intervencionPolicial: false, intervencionAmbulancia: true },
+  { intervencionPolicial: false, intervencionAmbulancia: false },
+];
 
 const LETRAS_PATENTE = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 
@@ -132,10 +147,17 @@ function buildSiniestros(aseguradoras) {
     // 1 de cada 3 siniestros tiene coordenadas cargadas; el resto queda sin marcar en el mapa
     const tieneCoordenadas = i % 3 === 0;
 
+    const huboHeridos = i % 5 === 0;
+    // Con/sin licencia repartido para tener ambos casos de prueba (7 de cada 20 sin licencia)
+    const tieneLicencia = i % 3 !== 0;
+
     const data = {
       fechaSiniestro: addDays('2026-05-01', i * 3),
       horaSiniestro: HORAS[i % HORAS.length],
-      huboHeridos: i % 5 === 0,
+      huboHeridos,
+      // Solo se informa intervención policial/ambulancia cuando hubo heridos
+      ...(huboHeridos ? COMBINACIONES_INTERVENCION[(i / 5) % COMBINACIONES_INTERVENCION.length] : {}),
+      tieneLicencia,
       lugarCalle,
       lugarLocalidad,
       lugarProvincia: 'Buenos Aires',
@@ -217,6 +239,7 @@ async function main() {
   console.log('Iniciando la carga de datos (Seed)...');
 
   // Limpieza de tablas (el orden es importante para no romper relaciones)
+  await prisma.registroAuditoria.deleteMany();
   await prisma.evidencia.deleteMany();
   await prisma.tercero.deleteMany();
   await prisma.conductor.deleteMany();
@@ -250,11 +273,53 @@ async function main() {
   // 3. Crear 20 siniestros de prueba con datos variados
   const siniestrosData = buildSiniestros(aseguradoras);
   let creados = 0;
-  for (const data of siniestrosData) {
-    await prisma.siniestro.create({ data });
+  const auditoriaSeed = [];
+
+  for (const [i, data] of siniestrosData.entries()) {
+    const creado = await prisma.siniestro.create({
+      data,
+      include: { titular: true, conductor: true, terceros: true },
+    });
     creados += 1;
+
+    // Dejamos algunos registros de auditoría de ejemplo, simulando ediciones ya hechas desde el panel
+    if (i === 0 && creado.titular) {
+      auditoriaSeed.push({
+        siniestroId: creado.id,
+        entidad: 'titular',
+        entidadId: creado.titular.id,
+        adminId: admins[0].id,
+        adminEmail: admins[0].email,
+        cambios: { telefono: { anterior: '2234000000', nuevo: creado.titular.telefono } },
+      });
+    }
+    if (i === 1 && creado.conductor) {
+      auditoriaSeed.push({
+        siniestroId: creado.id,
+        entidad: 'conductor',
+        entidadId: creado.conductor.id,
+        adminId: admins[1].id,
+        adminEmail: admins[1].email,
+        cambios: { vinculo: { anterior: 'Amigo', nuevo: creado.conductor.vinculo } },
+      });
+    }
+    if (i === 6 && creado.terceros?.length) {
+      auditoriaSeed.push({
+        siniestroId: creado.id,
+        entidad: 'tercero',
+        entidadId: creado.terceros[0].id,
+        adminId: admins[0].id,
+        adminEmail: admins[0].email,
+        cambios: { patente: { anterior: 'AAA000', nuevo: creado.terceros[0].patente } },
+      });
+    }
   }
   console.log(`${creados} siniestros creados`);
+
+  if (auditoriaSeed.length) {
+    await prisma.registroAuditoria.createMany({ data: auditoriaSeed });
+    console.log(`${auditoriaSeed.length} registros de auditoría de ejemplo creados`);
+  }
 
   console.log('¡Carga de datos finalizada!');
 }

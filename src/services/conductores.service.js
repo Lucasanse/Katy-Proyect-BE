@@ -1,5 +1,6 @@
 const prisma = require('../prisma/client');
 const { ApiError } = require('../middlewares/error.middleware');
+const { registrarAuditoria } = require('../utils/auditoria');
 
 async function addToSiniestro(siniestroId, data) {
   const siniestro = await prisma.siniestro.findUnique({
@@ -20,12 +21,21 @@ async function addToSiniestro(siniestroId, data) {
   });
 }
 
-async function update(id, data) {
+async function update(id, data, admin) {
   const conductor = await prisma.conductor.findUnique({ where: { id } });
 
   if (!conductor) {
     throw new ApiError(404, 'Conductor no encontrado');
   }
+
+  await registrarAuditoria({
+    siniestroId: conductor.siniestroId,
+    entidad: 'conductor',
+    entidadId: id,
+    admin,
+    anterior: conductor,
+    nuevo: data,
+  });
 
   return prisma.conductor.update({ where: { id }, data });
 }

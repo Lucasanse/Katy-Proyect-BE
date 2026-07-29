@@ -6,7 +6,7 @@ const { updateTerceroSchema } = require('../validations/terceros.validation');
 
 const router = Router();
 
-router.put('/:id', validate(updateTerceroSchema), tercerosController.update);
+router.put('/:id', requireAuth, validate(updateTerceroSchema), tercerosController.update);
 router.delete('/:id', requireAuth, tercerosController.remove);
 
 module.exports = router;

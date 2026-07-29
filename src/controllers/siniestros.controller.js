@@ -38,8 +38,27 @@ async function updateEstado(req, res, next) {
 
 async function update(req, res, next) {
   try {
-    const siniestro = await siniestrosService.update(Number(req.params.id), req.body);
+    const siniestro = await siniestrosService.update(Number(req.params.id), req.body, req.admin);
     res.json(siniestro);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function consultar(req, res, next) {
+  try {
+    const { numero, credencial } = req.validatedQuery;
+    const resultado = await siniestrosService.consultarPorNumeroYCredencial(numero, credencial);
+    res.json(resultado);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getAuditoria(req, res, next) {
+  try {
+    const auditoria = await siniestrosService.getAuditoria(Number(req.params.id));
+    res.json(auditoria);
   } catch (err) {
     next(err);
   }
@@ -54,4 +73,4 @@ async function remove(req, res, next) {
   }
 }
 
-module.exports = { create, list, getById, updateEstado, update, remove };
+module.exports = { create, list, getById, updateEstado, update, remove, getAuditoria, consultar };

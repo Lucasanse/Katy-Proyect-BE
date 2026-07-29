@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Siniestro" ADD COLUMN     "estadoActualizadoEn" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
