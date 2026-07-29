@@ -19,8 +19,8 @@ const FULL_INCLUDE = {
   evidencias: true,
 };
 
-async function create(data) {
-  const { titular, conductor, productor, terceros, ...siniestroData } = data;
+async function create(data, admin) {
+  const { titular, conductor, productor, terceros, omitirNotificacion, ...siniestroData } = data;
 
   const creado = await prisma.siniestro.create({
     data: {
@@ -35,8 +35,11 @@ async function create(data) {
 
   const resultado = conNumero(creado);
 
-  // Confirmación por email: al productor de seguros si hay uno cargado, si no al titular del vehículo
-  const destinatario = creado.productor?.email || creado.titular?.email;
+  // Confirmación por email: al productor de seguros si hay uno cargado, si no al titular del vehículo.
+  // Se omite si lo carga un admin logueado (flujo interno del estudio) o si el wizard lo pide explícitamente
+  // (omitirNotificacion, que manda el flujo skipVerification del panel): no tiene sentido mandarle mail a nadie.
+  const evitarEmail = Boolean(admin) || Boolean(omitirNotificacion);
+  const destinatario = !evitarEmail && (creado.productor?.email || creado.titular?.email);
   if (destinatario) {
     try {
       await mailService.enviarConfirmacionSiniestro(destinatario, resultado.numero);

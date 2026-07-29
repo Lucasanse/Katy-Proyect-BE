@@ -76,6 +76,8 @@ const createSiniestroSchema = z.object({
       conductor: conductorSchema.optional(),
       productor: productorSchema.optional(),
       terceros: z.array(terceroSchema).optional(),
+      // Lo manda el wizard cuando lo carga un admin desde el panel: no hace falta mandarle mail a nadie
+      omitirNotificacion: z.boolean().optional(),
     })
     .superRefine(validarIntervenciones),
 });

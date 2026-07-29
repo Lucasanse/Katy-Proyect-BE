@@ -2,7 +2,7 @@ const { Router } = require('express');
 const siniestrosController = require('../controllers/siniestros.controller');
 const conductoresController = require('../controllers/conductores.controller');
 const tercerosController = require('../controllers/terceros.controller');
-const { requireAuth } = require('../middlewares/auth.middleware');
+const { requireAuth, optionalAuth } = require('../middlewares/auth.middleware');
 const { validate } = require('../middlewares/validate.middleware');
 const {
   createSiniestroSchema,
@@ -17,7 +17,8 @@ const { createTerceroSchema } = require('../validations/terceros.validation');
 const router = Router();
 
 // Flujo del cliente: creación del reclamo (puede llegar completo o en pasos)
-router.post('/', validate(createSiniestroSchema), siniestrosController.create);
+// optionalAuth: si lo crea un admin logueado (flujo interno del estudio) no hace falta el mail de confirmación
+router.post('/', optionalAuth, validate(createSiniestroSchema), siniestrosController.create);
 router.post('/:id/conductores', validate(addConductorSchema), conductoresController.addToSiniestro);
 router.post('/:id/terceros', validate(createTerceroSchema), tercerosController.addToSiniestro);
 
