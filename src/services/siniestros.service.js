@@ -62,19 +62,27 @@ async function list({ page, limit, estado, fechaDesde, fechaHasta, search, sortB
           },
         }
       : {}),
+    // Busca por nombre/apellido del titular o por nombre del productor de seguros.
+    // El filtro de productor pide esProductor: true para no traer siniestros que en la tabla
+    // se muestran sin productor por tener el toggle apagado.
     ...(search
       ? {
-          titular: {
-            OR: [
-              { nombre: { contains: search, mode: 'insensitive' } },
-              { apellido: { contains: search, mode: 'insensitive' } },
-            ],
-          },
+          OR: [
+            { titular: { nombre: { contains: search, mode: 'insensitive' } } },
+            { titular: { apellido: { contains: search, mode: 'insensitive' } } },
+            { productor: { esProductor: true, nombre: { contains: search, mode: 'insensitive' } } },
+          ],
         }
       : {}),
   };
 
-  const orderBy = sortBy === 'titular' ? { titular: { nombre: order } } : { [sortBy]: order };
+  // Las relaciones 1-1 se ordenan por un campo de la tabla hija; el resto son columnas de Siniestro.
+  const ORDEN_POR_RELACION = {
+    titular: (dir) => ({ titular: { nombre: dir } }),
+    productor: (dir) => ({ productor: { nombre: dir } }),
+  };
+
+  const orderBy = ORDEN_POR_RELACION[sortBy] ? ORDEN_POR_RELACION[sortBy](order) : { [sortBy]: order };
 
   const [data, total] = await Promise.all([
     prisma.siniestro.findMany({
@@ -85,7 +93,7 @@ async function list({ page, limit, estado, fechaDesde, fechaHasta, search, sortB
       include: {
         titular: { include: { aseguradora: true } },
         conductor: true,
-        _count: { select: { terceros: true, evidencias: true } },
+        productor: true,
       },
     }),
     prisma.siniestro.count({ where }),

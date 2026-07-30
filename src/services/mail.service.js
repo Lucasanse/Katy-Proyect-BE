@@ -2,23 +2,63 @@ const nodemailer = require('nodemailer');
 
 let transporter;
 
+// Devuelve la config SMTP validada. Tira error con un mensaje claro si falta algo,
+// así en producción nos enteramos al arrancar y no cuando un usuario pide el código.
+function leerConfig() {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_FROM } = process.env;
+
+  const faltantes = [];
+  if (!SMTP_HOST) faltantes.push('SMTP_HOST');
+  if (!MAIL_FROM) faltantes.push('MAIL_FROM');
+  // Los proveedores reales (Resend, Brevo, SendGrid, Gmail...) siempre piden credenciales.
+  if (!SMTP_USER) faltantes.push('SMTP_USER');
+  if (!SMTP_PASS) faltantes.push('SMTP_PASS');
+
+  if (faltantes.length) {
+    throw new Error(
+      `Faltan variables de entorno para enviar mails: ${faltantes.join(', ')}. ` +
+        'Revisá el .env.example para ver cómo configurar el proveedor SMTP.',
+    );
+  }
+
+  const port = Number(SMTP_PORT) || 587;
+
+  return {
+    host: SMTP_HOST,
+    port,
+    // 465 usa TLS desde el saludo inicial; 587 y 2525 arrancan en claro y suben a TLS con STARTTLS.
+    secure: port === 465,
+    requireTLS: port !== 465,
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+    // Reusamos conexiones: el aviso diario de reclamos manda varios mails seguidos.
+    pool: true,
+    maxConnections: 3,
+  };
+}
+
 function getTransporter() {
   if (!transporter) {
-    const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
-
-    transporter = nodemailer.createTransport({
-      host: SMTP_HOST,
-      port: Number(SMTP_PORT) || 587,
-      // Sin usuario/contraseña no mandamos "auth": algunos servidores (o un SMTP local de prueba) no lo esperan
-      ...(SMTP_USER && SMTP_PASS ? { auth: { user: SMTP_USER, pass: SMTP_PASS } } : {}),
-    });
+    transporter = nodemailer.createTransport(leerConfig());
   }
   return transporter;
 }
 
+// Remitente completo. Muchos proveedores rechazan el envío si el dominio de MAIL_FROM
+// no está verificado en su panel, así que este valor tiene que coincidir con el dominio verificado.
+function remitente() {
+  const email = process.env.MAIL_FROM;
+  const nombre = process.env.MAIL_FROM_NAME;
+  return nombre ? `"${nombre}" <${email}>` : email;
+}
+
+// Chequea que las credenciales SMTP sean válidas sin mandar ningún mail.
+async function verificarConexion() {
+  await getTransporter().verify();
+}
+
 async function enviarCodigoVerificacion(destinatario, codigo) {
   await getTransporter().sendMail({
-    from: process.env.MAIL_FROM || 'no-reply@misionsiniestros.com',
+    from: remitente(),
     to: destinatario,
     subject: 'Código de verificación - Misión Siniestros',
     text: `Tu código de verificación es: ${codigo}\n\nVence en 10 minutos. Si no lo pediste vos, ignorá este mensaje.`,
@@ -51,7 +91,7 @@ async function enviarAvisoReclamosAntiguos(destinatarios, reclamos) {
     .join('');
 
   await getTransporter().sendMail({
-    from: process.env.MAIL_FROM || 'no-reply@misionsiniestros.com',
+    from: remitente(),
     to: destinatarios.join(', '),
     subject: `Misión Siniestros - ${reclamos.length} reclamo(s) con más de 20 días sin avanzar`,
     text: reclamos
@@ -85,7 +125,7 @@ async function enviarConfirmacionSiniestro(destinatario, numero) {
   const urlConsultas = `${panelUrl}/consultas`;
 
   await getTransporter().sendMail({
-    from: process.env.MAIL_FROM || 'no-reply@misionsiniestros.com',
+    from: remitente(),
     to: destinatario,
     subject: `Misión Siniestros - Reclamo ${numero} registrado`,
     text: `Tu reclamo quedó registrado con el número: ${numero}\n\nGuardá este número: lo vas a necesitar para consultar el estado de tu reclamo en ${urlConsultas} (apartado "Consultar Reclamo"), junto con la matrícula del productor de seguros o, si no cargaste uno, tu DNI.`,
@@ -105,4 +145,9 @@ async function enviarConfirmacionSiniestro(destinatario, numero) {
   });
 }
 
-module.exports = { enviarCodigoVerificacion, enviarAvisoReclamosAntiguos, enviarConfirmacionSiniestro };
+module.exports = {
+  verificarConexion,
+  enviarCodigoVerificacion,
+  enviarAvisoReclamosAntiguos,
+  enviarConfirmacionSiniestro,
+};

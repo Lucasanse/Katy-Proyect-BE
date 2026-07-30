@@ -82,7 +82,7 @@ const createSiniestroSchema = z.object({
     .superRefine(validarIntervenciones),
 });
 
-const SORT_FIELDS = ['createdAt', 'fechaSiniestro', 'titular'];
+const SORT_FIELDS = ['createdAt', 'fechaSiniestro', 'titular', 'productor'];
 
 const listSiniestrosSchema = z.object({
   query: z.object({
