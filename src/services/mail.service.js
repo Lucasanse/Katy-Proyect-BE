@@ -23,16 +23,17 @@ function leerConfig() {
 
   const port = Number(SMTP_PORT) || 587;
 
-  return {
+   return {
     host: SMTP_HOST,
     port,
-    // 465 usa TLS desde el saludo inicial; 587 y 2525 arrancan en claro y suben a TLS con STARTTLS.
     secure: port === 465,
     requireTLS: port !== 465,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
-    // Reusamos conexiones: el aviso diario de reclamos manda varios mails seguidos.
     pool: true,
     maxConnections: 3,
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
   };
 }
 
