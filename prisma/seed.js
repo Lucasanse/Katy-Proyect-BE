@@ -249,17 +249,13 @@ async function main() {
   await prisma.administrador.deleteMany();
   await prisma.aseguradora.deleteMany();
 
-  // 1. Crear los usuarios Administrador (cualquiera de ellos ve todos los siniestros: no hay dueños por admin)
-  const [passwordHashPrincipal, passwordHashAdmin, passwordHashKaty] = await Promise.all([
-    bcrypt.hash('admin123', 10),
-    bcrypt.hash('admin', 10),
-    bcrypt.hash('admin', 10),
-  ]);
+  // 1. Crear el único usuario Administrador (no hay dueños por admin: ve todos los siniestros).
+  // Para cambiar el mail/contraseña en un ambiente ya cargado, usar "npm run admin:reset"
+  // en lugar de este seed (ese script no borra siniestros ni aseguradoras).
+  const passwordHashAdmin = await bcrypt.hash('vT@iKzn@9VxyYpFEy96P', 10);
   const admins = await prisma.administrador.createManyAndReturn({
     data: [
-      { email: 'admin@tuseguro.com', password: passwordHashPrincipal },
-      { email: 'admin@admin.com', password: passwordHashAdmin },
-      { email: 'katy@admin.com', password: passwordHashKaty },
+      { email: 'misionadministrador@gmail.com', password: passwordHashAdmin },
     ],
   });
   admins.forEach((a) => console.log('Administrador creado:', a.email));
