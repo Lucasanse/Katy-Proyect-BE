@@ -1,5 +1,11 @@
 const MAILJET_API_URL = 'https://api.mailjet.com/v3.1/send';
 
+// CORS_ORIGIN puede tener varios orígenes separados por coma; para armar links en los
+// mails usamos el primero como URL "canónica" del panel.
+function primerOrigen() {
+  return (process.env.CORS_ORIGIN || 'http://localhost:5173').split(',')[0].trim();
+}
+
 // Devuelve las credenciales validadas. Tira error con un mensaje claro si falta algo,
 // así en producción nos enteramos al arrancar y no cuando un usuario pide el código.
 function leerConfig() {
@@ -81,7 +87,7 @@ async function enviarCodigoVerificacion(destinatario, codigo) {
 async function enviarAvisoReclamosAntiguos(destinatarios, reclamos) {
   if (!destinatarios.length || !reclamos.length) return;
 
-  const panelUrl = process.env.CORS_ORIGIN || 'http://localhost:5173';
+  const panelUrl = primerOrigen();
 
   const filas = reclamos
     .map(
@@ -126,7 +132,7 @@ async function enviarAvisoReclamosAntiguos(destinatarios, reclamos) {
 }
 
 async function enviarConfirmacionSiniestro(destinatario, numero) {
-  const panelUrl = process.env.CORS_ORIGIN || 'http://localhost:5173';
+  const panelUrl = primerOrigen();
   const urlConsultas = `${panelUrl}/consultas`;
 
   await enviar({

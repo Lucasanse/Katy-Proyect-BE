@@ -9,7 +9,12 @@ const { enviarAvisosReclamosAntiguos } = require('./services/notificaciones.serv
 
 const app = express();
 
-app.use(cors({ origin: process.env.CORS_ORIGIN || true, credentials: true }));
+// CORS_ORIGIN admite una lista separada por comas (ej: "https://a.com,https://www.a.com")
+const corsOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
+  : true;
+
+app.use(cors({ origin: corsOrigins, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 
