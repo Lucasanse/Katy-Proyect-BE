@@ -1,4 +1,4 @@
-const nodemailer = require('nodemailer');
+const MAILJET_API_URL = 'https://api.mailjet.com/v3.1/send';
 
 // CORS_ORIGIN puede tener varios orígenes separados por coma; para armar links en los
 // mails usamos el primero como URL "canónica" del panel.
@@ -6,16 +6,12 @@ function primerOrigen() {
   return (process.env.CORS_ORIGIN || 'http://localhost:5173').split(',')[0].trim();
 }
 
-// Valida que estén las variables de entorno necesarias. Tira error con un mensaje claro
-// si falta algo, así en producción nos enteramos al arrancar y no cuando un usuario pide
-// el código. SMTP genérico: sirve para cualquier proveedor (Brevo, Resend, Gmail, Mailjet
-// por SMTP, Mailtrap para desarrollo), con las variables descriptas en .env.example.
+// Devuelve las credenciales validadas. Tira error con un mensaje claro si falta algo,
+// así en producción nos enteramos al arrancar y no cuando un usuario pide el código.
 function leerConfig() {
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_FROM } = process.env;
+  const { SMTP_USER, SMTP_PASS, MAIL_FROM } = process.env;
 
   const faltantes = [];
-  if (!SMTP_HOST) faltantes.push('SMTP_HOST');
-  if (!SMTP_PORT) faltantes.push('SMTP_PORT');
   if (!MAIL_FROM) faltantes.push('MAIL_FROM');
   if (!SMTP_USER) faltantes.push('SMTP_USER');
   if (!SMTP_PASS) faltantes.push('SMTP_PASS');
@@ -23,39 +19,52 @@ function leerConfig() {
   if (faltantes.length) {
     throw new Error(
       `Faltan variables de entorno para enviar mails: ${faltantes.join(', ')}. ` +
-        'Revisá el .env.example para ver cómo configurar el proveedor SMTP.',
+        'Revisá el .env.example para ver cómo configurar Mailjet.',
     );
   }
 
-  return {
-    host: SMTP_HOST,
-    port: Number(SMTP_PORT),
-    secure: Number(SMTP_PORT) === 465,
-    auth: { user: SMTP_USER, pass: SMTP_PASS },
-  };
+  // Mailjet usa la misma API Key / Secret Key para SMTP y para la API REST.
+  return { apiKey: SMTP_USER, secretKey: SMTP_PASS };
 }
 
-let transporterCache;
-
-function transporter() {
-  if (!transporterCache) transporterCache = nodemailer.createTransport(leerConfig());
-  return transporterCache;
+function authHeader() {
+  const { apiKey, secretKey } = leerConfig();
+  return `Basic ${Buffer.from(`${apiKey}:${secretKey}`).toString('base64')}`;
 }
 
 // Remitente completo. Muchos proveedores rechazan el envío si el dominio de MAIL_FROM
 // no está verificado en su panel, así que este valor tiene que coincidir con el dominio verificado.
 function remitente() {
-  const nombre = process.env.MAIL_FROM_NAME;
-  return nombre ? `"${nombre}" <${process.env.MAIL_FROM}>` : process.env.MAIL_FROM;
+  return { Email: process.env.MAIL_FROM, Name: process.env.MAIL_FROM_NAME };
 }
 
-async function enviar({ to, subject, text, html }) {
-  await transporter().sendMail({ from: remitente(), to, subject, text, html });
+async function enviar(mensaje) {
+  const response = await fetch(MAILJET_API_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: authHeader(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ Messages: [mensaje] }),
+  });
+
+  if (!response.ok) {
+    const detalle = await response.text();
+    throw new Error(`Mailjet respondió ${response.status}: ${detalle}`);
+  }
+
+  return response.json();
 }
 
-// Chequea que las credenciales SMTP sean válidas sin mandar ningún mail.
+// Chequea que las credenciales de Mailjet sean válidas sin mandar ningún mail.
 async function verificarConexion() {
-  await transporter().verify();
+  const response = await fetch('https://api.mailjet.com/v3/REST/apikey', {
+    headers: { Authorization: authHeader() },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Credenciales de Mailjet inválidas (HTTP ${response.status})`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -139,10 +148,11 @@ function boton(href, texto) {
 
 async function enviarCodigoVerificacion(destinatario, codigo) {
   await enviar({
-    to: destinatario,
-    subject: 'Código de verificación - Misión Siniestros',
-    text: `Tu código de verificación es: ${codigo}\n\nVence en 10 minutos. Si no lo pediste vos, ignorá este mensaje.`,
-    html: layout(`
+    From: remitente(),
+    To: [{ Email: destinatario }],
+    Subject: 'Código de verificación - Misión Siniestros',
+    TextPart: `Tu código de verificación es: ${codigo}\n\nVence en 10 minutos. Si no lo pediste vos, ignorá este mensaje.`,
+    HTMLPart: layout(`
       <h1 style="margin:0 0 12px;font-family:'Poppins','Jost',Helvetica,Arial,sans-serif;font-size:20px;color:${TEXTO};">Tu código de verificación</h1>
       <p style="margin:0 0 20px;color:${TEXTO_SUAVE};">Usalo para continuar con tu trámite:</p>
       <p style="margin:0 0 20px;text-align:center;background:${MARCA_SUAVE};border-radius:8px;padding:18px;font-size:34px;font-weight:700;letter-spacing:8px;color:${TEXTO};">
@@ -173,12 +183,13 @@ async function enviarAvisoReclamosAntiguos(destinatarios, reclamos) {
     .join('');
 
   await enviar({
-    to: destinatarios,
-    subject: `Misión Siniestros - ${reclamos.length} reclamo(s) con más de 20 días sin avanzar`,
-    text: reclamos
+    From: remitente(),
+    To: destinatarios.map((email) => ({ Email: email })),
+    Subject: `Misión Siniestros - ${reclamos.length} reclamo(s) con más de 20 días sin avanzar`,
+    TextPart: reclamos
       .map((r) => `${r.numeroSiniestro} - ${r.nombreAsegurado} - ${r.estado} - ${r.diasEnEseEstado} días`)
       .join('\n'),
-    html: layout(`
+    HTMLPart: layout(`
       <h1 style="margin:0 0 12px;font-family:'Poppins','Jost',Helvetica,Arial,sans-serif;font-size:20px;color:${TEXTO};">Reclamos que necesitan revisión</h1>
       <p style="margin:0 0 20px;color:${TEXTO_SUAVE};">
         Los siguientes reclamos llevan más de 20 días en el mismo estado:
@@ -206,10 +217,11 @@ async function enviarConfirmacionSiniestro(destinatario, numero) {
   const urlConsultas = `${panelUrl}/consultas`;
 
   await enviar({
-    to: destinatario,
-    subject: `Misión Siniestros - Reclamo ${numero} registrado`,
-    text: `Tu reclamo quedó registrado con el número: ${numero}\n\nGuardá este número: lo vas a necesitar para consultar el estado de tu reclamo en ${urlConsultas} (apartado "Consultar Reclamo"), junto con la matrícula del productor de seguros o, si no cargaste uno, tu DNI.`,
-    html: layout(`
+    From: remitente(),
+    To: [{ Email: destinatario }],
+    Subject: `Misión Siniestros - Reclamo ${numero} registrado`,
+    TextPart: `Tu reclamo quedó registrado con el número: ${numero}\n\nGuardá este número: lo vas a necesitar para consultar el estado de tu reclamo en ${urlConsultas} (apartado "Consultar Reclamo"), junto con la matrícula del productor de seguros o, si no cargaste uno, tu DNI.`,
+    HTMLPart: layout(`
       <h1 style="margin:0 0 12px;font-family:'Poppins','Jost',Helvetica,Arial,sans-serif;font-size:20px;color:${TEXTO};">Reclamo registrado</h1>
       <p style="margin:0 0 12px;color:${TEXTO_SUAVE};">Tu reclamo quedó registrado con el número:</p>
       <p style="margin:0 0 20px;text-align:center;background:${MARCA_SUAVE};border-radius:8px;padding:16px;font-size:28px;font-weight:700;letter-spacing:2px;color:${TEXTO};">

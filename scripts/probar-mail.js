@@ -1,4 +1,4 @@
-// Prueba que el SMTP configurado en .env pueda mandar mails de verdad.
+// Prueba que Mailjet configurado en .env pueda mandar mails de verdad.
 // Uso: npm run mail:test -- tu-mail@ejemplo.com
 require('dotenv').config();
 const mailService = require('../src/services/mail.service');
@@ -11,9 +11,9 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('Verificando credenciales SMTP...');
+  console.log('Verificando credenciales de Mailjet...');
   await mailService.verificarConexion();
-  console.log('Credenciales SMTP OK.');
+  console.log('Credenciales de Mailjet OK.');
 
   console.log(`Enviando código de prueba a ${destinatario} desde ${process.env.MAIL_FROM}...`);
   await mailService.enviarCodigoVerificacion(destinatario, '123456');
