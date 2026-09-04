@@ -1,4 +1,59 @@
+const nodemailer = require('nodemailer');
+
 const MAILJET_API_URL = 'https://api.mailjet.com/v3.1/send';
+
+// En producción (Vercel) se manda por la API REST de Mailjet porque Vercel no permite
+// conexiones SMTP salientes. Para probar en local con otro proveedor (Mailtrap, Brevo,
+// Gmail, etc.) alcanza con descomentar su bloque SMTP_* en el .env: si SMTP_HOST no es
+// el de Mailjet, se manda por SMTP real (nodemailer) en lugar de la API REST.
+function esMailjet() {
+  return (process.env.SMTP_HOST || '').includes('mailjet');
+}
+
+let transporteSMTP;
+function obtenerTransporteSMTP() {
+  if (!transporteSMTP) {
+    const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
+    if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+      throw new Error(
+        'Faltan variables de entorno para enviar mails por SMTP (SMTP_HOST, SMTP_USER, SMTP_PASS). ' +
+          'Revisá el .env.example para ver cómo configurar Mailtrap u otro proveedor.',
+      );
+    }
+    transporteSMTP = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: Number(SMTP_PORT) || 587,
+      secure: Number(SMTP_PORT) === 465,
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+    });
+  }
+  return transporteSMTP;
+}
+
+// Convierte el mensaje con la forma de la API de Mailjet ({From, To, Subject, TextPart,
+// HTMLPart}, la que usan todas las plantillas de este archivo) al formato de nodemailer,
+// para no tener que duplicar cada plantilla según el proveedor.
+function aMensajeNodemailer({ From, To, Subject, TextPart, HTMLPart }) {
+  return {
+    from: `"${From.Name || ''}" <${From.Email}>`,
+    to: To.map((destinatario) => destinatario.Email).join(', '),
+    subject: Subject,
+    text: TextPart,
+    html: HTMLPart,
+  };
+}
+
+// Casilla que usa la administradora: aparece como contacto en el pie de todos los
+// mails y es la que recibe los avisos de siniestros nuevos (ver enviarAvisoNuevoSiniestro).
+const EMAIL_ADMIN = 'direccion@misionsiniestros.com.ar';
+
+// fechaSiniestro se guarda como texto "YYYY-MM-DD"; para el mail solo cambia cómo se muestra.
+function formatearFechaSiniestro(fechaIso) {
+  if (!fechaIso) return fechaIso;
+  const [anio, mes, dia] = fechaIso.split('-');
+  if (!anio || !mes || !dia) return fechaIso;
+  return `${dia}-${mes}-${anio}`;
+}
 
 // CORS_ORIGIN puede tener varios orígenes separados por coma; para armar links en los
 // mails usamos el primero como URL "canónica" del panel.
@@ -39,6 +94,11 @@ function remitente() {
 }
 
 async function enviar(mensaje) {
+  if (!esMailjet()) {
+    await obtenerTransporteSMTP().sendMail(aMensajeNodemailer(mensaje));
+    return;
+  }
+
   const response = await fetch(MAILJET_API_URL, {
     method: 'POST',
     headers: {
@@ -56,8 +116,13 @@ async function enviar(mensaje) {
   return response.json();
 }
 
-// Chequea que las credenciales de Mailjet sean válidas sin mandar ningún mail.
+// Chequea que las credenciales del proveedor configurado sean válidas sin mandar ningún mail.
 async function verificarConexion() {
+  if (!esMailjet()) {
+    await obtenerTransporteSMTP().verify();
+    return;
+  }
+
   const response = await fetch('https://api.mailjet.com/v3/REST/apikey', {
     headers: { Authorization: authHeader() },
   });
@@ -125,7 +190,7 @@ function layout(contenidoHtml) {
                       &copy; ${anio} Misión Siniestros. Todos los derechos reservados.
                     </p>
                     <p style="margin:4px 0 0;color:${TEXTO_SUAVE};font-size:12px;">
-                      Contacto: <a href="mailto:misionsiniestros@gmail.com" style="color:${TEXTO_SUAVE};">misionsiniestros@gmail.com</a>
+                      Contacto: <a href="mailto:${EMAIL_ADMIN}" style="color:${TEXTO_SUAVE};">${EMAIL_ADMIN}</a>
                     </p>
                   </td>
                 </tr>
@@ -241,9 +306,54 @@ async function enviarConfirmacionSiniestro(destinatario, numero) {
   });
 }
 
+// Aviso a la administradora (EMAIL_ADMIN, y cualquier otro admin cargado en la tabla
+// Administrador) cada vez que se registra un siniestro nuevo, sin importar quién lo cargó.
+async function enviarAvisoNuevoSiniestro(destinatarios, datos) {
+  if (!destinatarios.length) return;
+
+  const panelUrl = primerOrigen();
+  const { numero, nombreAsegurado, fecha, hora, lugar } = datos;
+
+  await enviar({
+    From: remitente(),
+    To: destinatarios.map((email) => ({ Email: email })),
+    Subject: `Misión Siniestros - Nuevo reclamo ${numero}`,
+    TextPart: `Se registró un nuevo siniestro.\n\nNúmero: ${numero}\nAsegurado: ${nombreAsegurado}\nFecha: ${formatearFechaSiniestro(fecha)} ${hora || ''}\nLugar: ${lugar}\n\nVer el detalle en el panel: ${panelUrl}/admin`,
+    HTMLPart: layout(`
+      <h1 style="margin:0 0 12px;font-family:'Poppins','Jost',Helvetica,Arial,sans-serif;font-size:20px;color:${TEXTO};">Nuevo siniestro registrado</h1>
+      <p style="margin:0 0 20px;color:${TEXTO_SUAVE};">Se cargó un reclamo nuevo en el sistema:</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:24px;background:${MARCA_SUAVE};border-radius:8px;">
+        <tbody>
+          <tr>
+            <td style="padding:10px 14px;font-size:13px;color:${TEXTO_SUAVE};">Número</td>
+            <td style="padding:10px 14px;font-size:14px;font-weight:600;color:${TEXTO};">${numero}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;font-size:13px;color:${TEXTO_SUAVE};">Asegurado</td>
+            <td style="padding:10px 14px;font-size:14px;color:${TEXTO};">${nombreAsegurado}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;font-size:13px;color:${TEXTO_SUAVE};">Fecha</td>
+            <td style="padding:10px 14px;font-size:14px;color:${TEXTO};">${formatearFechaSiniestro(fecha)}${hora ? ` - ${hora}` : ''}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 14px;font-size:13px;color:${TEXTO_SUAVE};">Lugar</td>
+            <td style="padding:10px 14px;font-size:14px;color:${TEXTO};">${lugar}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="text-align:center;">
+        ${boton(`${panelUrl}/admin`, 'Ver en el panel')}
+      </div>
+    `),
+  });
+}
+
 module.exports = {
   verificarConexion,
   enviarCodigoVerificacion,
   enviarAvisoReclamosAntiguos,
   enviarConfirmacionSiniestro,
+  enviarAvisoNuevoSiniestro,
+  EMAIL_ADMIN,
 };

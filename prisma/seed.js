@@ -252,10 +252,10 @@ async function main() {
   // 1. Crear el único usuario Administrador (no hay dueños por admin: ve todos los siniestros).
   // Para cambiar el mail/contraseña en un ambiente ya cargado, usar "npm run admin:reset"
   // en lugar de este seed (ese script no borra siniestros ni aseguradoras).
-  const passwordHashAdmin = await bcrypt.hash('vT@iKzn@9VxyYpFEy96P', 10);
+  const passwordHashAdmin = await bcrypt.hash('AdminSiniestros2026', 10);
   const admins = await prisma.administrador.createManyAndReturn({
     data: [
-      { email: 'misionadministrador@gmail.com', password: passwordHashAdmin },
+      { email: 'direccion@misionsiniestros.com.ar', password: passwordHashAdmin },
     ],
   });
   admins.forEach((a) => console.log('Administrador creado:', a.email));

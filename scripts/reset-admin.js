@@ -11,8 +11,8 @@ require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const prisma = require('../src/prisma/client');
 
-const DEFAULT_EMAIL = 'misionadministrador@gmail.com';
-const DEFAULT_PASSWORD = 'vT@iKzn@9VxyYpFEy96P';
+const DEFAULT_EMAIL = 'direccion@misionsiniestros.com.ar';
+const DEFAULT_PASSWORD = 'AdminSiniestros2026';
 
 async function main() {
   const email = process.argv[2] || DEFAULT_EMAIL;

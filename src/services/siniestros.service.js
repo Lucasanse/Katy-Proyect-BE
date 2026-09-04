@@ -48,7 +48,33 @@ async function create(data, admin) {
     }
   }
 
+  // Aviso a la administradora: siempre se manda, sin importar quién cargó el siniestro
+  // ni si se omitió la confirmación al asegurado.
+  await notificarNuevoSiniestroAAdmin(creado, resultado.numero);
+
   return resultado;
+}
+
+// Avisa a todos los administradores (tabla Administrador, incluida la casilla
+// direccion@misionsiniestros.com.ar) que se cargó un siniestro nuevo. Un fallo acá
+// nunca debe hacer fallar la creación del siniestro.
+async function notificarNuevoSiniestroAAdmin(siniestro, numero) {
+  try {
+    const admins = await prisma.administrador.findMany({ select: { email: true } });
+    const destinatarios = admins.map((a) => a.email);
+
+    if (!destinatarios.length) return;
+
+    await mailService.enviarAvisoNuevoSiniestro(destinatarios, {
+      numero,
+      nombreAsegurado: siniestro.titular ? `${siniestro.titular.nombre} ${siniestro.titular.apellido}` : 'Sin datos de titular',
+      fecha: siniestro.fechaSiniestro,
+      hora: siniestro.horaSiniestro,
+      lugar: `${siniestro.lugarCalle}, ${siniestro.lugarLocalidad}`,
+    });
+  } catch (err) {
+    console.error('No se pudo enviar el aviso de siniestro nuevo a la administradora:', err);
+  }
 }
 
 async function list({ page, limit, estado, fechaDesde, fechaHasta, search, sortBy, order }) {
